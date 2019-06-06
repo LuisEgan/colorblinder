@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Dimensions, TouchableOpacity } from "react-native";
+import { View, Dimensions, TouchableOpacity, Text, Image } from "react-native";
 import { Header } from "../../components";
 import styles from "./styles";
 import { generateRGB, mutateRGB } from "../../utilities/colors";
@@ -8,19 +8,26 @@ export default class Game extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = {
+    this.initialState = {
       points: 0,
       timeLeft: 15,
-      rgb: generateRGB()
+      rgb: generateRGB(),
+      isPaused: false,
+      size: 2
     };
+
+    this.state = { ...this.initialState };
   }
 
   componentDidMount = () => {
     this.generateNewRound();
     this.interval = setInterval(() => {
-      this.setState(state => ({
-        timeLeft: state.timeLeft - 1
-      }));
+      const { isPaused, timeLeft } = this.state;
+      !isPaused &&
+        timeLeft >= 0 &&
+        this.setState(state => ({
+          timeLeft: state.timeLeft - 1
+        }));
     }, 1000);
   };
 
@@ -61,43 +68,123 @@ export default class Game extends React.Component {
     }
   };
 
-  render() {
-    const { rgb, size, diffTileIndex, diffTileColor } = this.state;
-    const { width } = Dimensions.get("window");
+  onBottomBarPress = () => {
+    const { timeLeft, isPaused } = this.state;
+    const lost = timeLeft < 0;
+    let newState = {};
+    let stateCb = null;
 
+    if (lost) {
+      newState = { ...this.initialState };
+      stateCb = this.generateNewRound;
+    } else {
+      newState.isPaused = !isPaused;
+    }
+
+    this.setState(newState, () => stateCb && stateCb());
+  };
+
+  render() {
+    const {
+      rgb,
+      size,
+      diffTileIndex,
+      diffTileColor,
+      points,
+      timeLeft,
+      isPaused
+    } = this.state;
     if (!diffTileIndex) return null;
+
+    const { width } = Dimensions.get("window");
+    const lost = timeLeft < 0;
+
+    const bottomIcon = lost
+      ? require("../../assets/icons/replay.png")
+      : isPaused
+      ? require("../../assets/icons/play.png")
+      : require("../../assets/icons/pause.png");
 
     return (
       <View style={styles.container}>
         <Header fontSize={30} />
 
-        <View style={styles.tilesContainer(width)}>
-          {Array(size)
-            .fill()
-            .map((val, columnIndex) => (
-              <View
-                style={{ flex: 1, flexDirection: "column" }}
-                key={columnIndex}
-              >
-                {Array(size)
-                  .fill()
-                  .map((val, rowIndex) => (
-                    <TouchableOpacity
-                      key={`${rowIndex}.${columnIndex}`}
-                      style={{
-                        flex: 1,
-                        backgroundColor:
-                          rowIndex === diffTileIndex[0] &&
-                          columnIndex === diffTileIndex[1]
-                            ? diffTileColor
-                            : `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
-                        margin: 2
-                      }}
-                      onPress={() => this.onTilePress(rowIndex, columnIndex)}
-                    />
-                  ))}
-              </View>
-            ))}
+        {/* GRID */}
+        {!isPaused && !lost && (
+          <View style={styles.tilesContainer(width)}>
+            {Array(size)
+              .fill()
+              .map((val, columnIndex) => (
+                <View
+                  style={{ flex: 1, flexDirection: "column" }}
+                  key={columnIndex}
+                >
+                  {Array(size)
+                    .fill()
+                    .map((val, rowIndex) => (
+                      <TouchableOpacity
+                        key={`${rowIndex}.${columnIndex}`}
+                        style={{
+                          flex: 1,
+                          backgroundColor:
+                            rowIndex === diffTileIndex[0] &&
+                            columnIndex === diffTileIndex[1]
+                              ? diffTileColor
+                              : `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+                          margin: 2
+                        }}
+                        onPress={() => this.onTilePress(rowIndex, columnIndex)}
+                      />
+                    ))}
+                </View>
+              ))}
+          </View>
+        )}
+
+        {/* BOTTOM */}
+        <View style={styles.bottomContainer}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.counterCount}>{points}</Text>
+            <Text style={styles.counterLabel}>points</Text>
+          </View>
+
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <TouchableOpacity onPress={this.onBottomBarPress}>
+              <Image source={bottomIcon} style={styles.bottomIcon} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.counterCount}>
+              {timeLeft < 0 ? "No" : timeLeft}
+            </Text>
+            <Text style={styles.counterLabel}>seconds left</Text>
+          </View>
+        </View>
+
+        {/* BEST SCORES */}
+        <View style={styles.bestContainer}>
+          <View style={styles.bestGrids}>
+            <Image
+              source={require("../../assets/icons/trophy.png")}
+              style={styles.bestIcon}
+            />
+            <Text style={styles.bestLabel}>0</Text>
+          </View>
+
+          <View style={styles.bestGrids}>
+            <Text>:p</Text>
+          </View>
+
+          <View style={styles.bestGrids}>
+            <Image
+              source={require("../../assets/icons/clock.png")}
+              style={styles.bestIcon}
+            />
+            <Text style={styles.bestLabel}>0</Text>
+          </View>
         </View>
       </View>
     );
